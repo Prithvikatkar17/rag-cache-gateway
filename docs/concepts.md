@@ -1,23 +1,18 @@
-# Concepts I learned
-
 ## 1. Embeddings
 **In one line:** An embedding turns a sentence into a list of numbers (a vector) so that sentences with similar meaning end up close together, and unrelated sentences end up far apart.
 
-**How it works:** An embedding model takes a sentence as input and outputs a fixed-length vector (384 numbers for all-MiniLM-L6-v2), no matter how long the sentence is. The model was trained on huge numbers of sentence pairs to pull related sentences close together and push unrelated ones apart. Each sentence becomes a point in a 384-dimensional space, and I compare two sentences by measuring how close their points are using cosine similarity (1.0 means same direction, around 0 means unrelated). No single number means anything on its own; the meaning is spread across all 384 together.
+**How it works:** An embedding model takes a sentence and outputs a fixed-length vector (384 numbers for all-MiniLM-L6-v2), regardless of sentence length. It was trained to pull related sentences close together and push unrelated ones apart. Each sentence becomes a point in 384-dimensional space. To compare two sentences I use cosine similarity: dot(a, b) / (|a| * |b|). The dot product multiplies the vectors position by position and sums; dividing by both lengths removes size so only direction matters. 1.0 means the same direction, 0 means unrelated. No single number means anything alone; the meaning is spread across all 384.
 
-**Where it's used in this project:**
-- Layer 2 semantic cache: embed the new question and find the closest saved question (`core/embedding.py`, `api/router.py`)
-- Document retrieval: embed the question and find the closest document chunks (`core/search_fusion.py`)
-- Redis stores these vectors and searches them with an HNSW index (`db/redis_client.py`)
+**Where it's used in this project:** (planned) embedding the question for the semantic cache lookup, and embedding the question to find similar document chunks.
 
 **What I tried:** I compared sentence pairs with cosine similarity:
-- SSH paraphrases: 0.48 (clearly the same question, but a low score)
+- SSH paraphrases: 0.48
 - SSH vs pizza (unrelated): 0.13
 - "reset my password" vs "steps to change my password": 0.823
-- "reset my password" vs "reset my router" (different topic): 0.53
+- "reset my password" vs "reset my router": 0.53
 - "I love this phone" vs "I hate this phone": 0.813
 
-**What surprised me / what I got wrong at first:** I expected love/hate to score low because the meanings are opposite, but it scored 0.813, almost the same as a true paraphrase (0.823). Embeddings mostly capture what a sentence is about (topic and context), and "love" and "hate" appear in the same kinds of sentences, so the model puts them close together. Negation and opposite words are often blurred. I also expected paraphrases to score above 0.8, but the SSH pair scored only 0.48, so real paraphrases can score low. The project's 0.88 threshold is a choice, not a rule.
+**What surprised me / what I got wrong at first:** I expected love/hate to score low because the meanings are opposite, but it scored 0.813, almost the same as a true paraphrase (0.823). Embeddings mostly capture what a sentence is about, and "love" and "hate" appear in the same kinds of sentences, so the model puts them close together. I also expected paraphrases to score high, but the SSH pair scored only 0.48. Any similarity cutoff I choose has to come from my own test pairs, not a number I copied.
 
 **Interview question I can now answer:** *"What's the risk of a semantic cache, and how would you reduce it?"*
-The main risk is a false hit: two questions with opposite or different meanings can have very similar embeddings, so the cache returns a confidently wrong answer. A similarity threshold alone can't fix this, because opposite pairs (0.813) can score as high as true paraphrases (0.823), while raising the threshold loses real paraphrase hits (0.48). To reduce the risk, I would use a high threshold, add a second check such as a cross-encoder that compares both sentences together, and set expiry times or avoid caching high-stakes questions.
+The main risk is a false hit: opposite or different questions can have very similar embeddings, so the cache returns a confidently wrong answer. A threshold alone can't fix it, because opposite pairs (0.813) can score as high as real paraphrases (0.823), while a high threshold misses real paraphrases (0.48). To reduce the risk I would use a conservative threshold, add a second check such as a cross-encoder that reads both sentences together, and avoid caching high-stakes questions.
