@@ -16,3 +16,49 @@
 
 **Interview question I can now answer:** *"What's the risk of a semantic cache, and how would you reduce it?"*
 The main risk is a false hit: opposite or different questions can have very similar embeddings, so the cache returns a confidently wrong answer. A threshold alone can't fix it, because opposite pairs (0.813) can score as high as real paraphrases (0.823), while a high threshold misses real paraphrases (0.48). To reduce the risk I would use a conservative threshold, add a second check such as a cross-encoder that reads both sentences together, and avoid caching high-stakes questions.
+
+
+## 2. Cosine similarity
+
+**In one line:** Cosine similarity measures how closely two vectors point in the same direction. It returns 1 for the same direction, 0 for unrelated, and -1 for opposite.
+
+**How it works:**
+- Formula: cosine(a, b) = dot(a, b) / (|a| * |b|)
+- Dot product: multiply the two vectors position by position, then add up the results. Example: [1, 2, 3] . [4, 5, 6] = 1*4 + 2*5 + 3*6 = 32
+- |a| is the vector's length: square each number, add them, take the square root
+- Dividing by both lengths removes the effect of size, so only direction counts. [3, 0] and [5, 0] have different lengths but point the same way, so they score exactly 1.0
+- Why direction and not length: embedding models put the meaning in the direction. Two sentences on the same topic can give vectors of different lengths, and cosine ignores that
+- Normalized vectors: if every vector has length 1, the division does nothing and cosine is just the dot product. I checked this, and `np.linalg.norm` of the model's vector printed 1.0, so the model's vectors are already normalized
+- `stored_vecs @ q` takes the dot product of every stored row with q in one step, which is why it gave me valid cosine scores (stored_vecs is (5, 384), q is (384,), and the result is 5 scores)
+
+**Similarity vs distance:**
+- similarity: 1 means identical
+- distance = 1 - similarity: 0 means identical
+- Redis returns distance, not similarity. Comparing one as if it were the other flips the logic, and the best match would look like the worst. Example from my run: similarity 0.713 means distance 0.287
+
+**Brute-force search:**
+- Compare the query against every stored vector and take the highest score
+- It is correct, but the cost grows with the number of stored vectors: 1 million vectors means 1 million comparisons per query
+- That's why vector indexes (HNSW) exist, which is the next concept
+- It also always returns a "best" match, even a bad one (0.396 for the router sentence). A cutoff is needed to say "nothing here is close enough", and it has to come from my own data
+
+**Where it's used in this project:** (planned) comparing a new question with saved questions for the cache, and with document chunks for retrieval. Redis will compute it for me, using distance.
+
+**What I tried:**
+- Part A (by hand): [3,0] vs [5,0] = 1.0, [1,0] vs [0,1] = 0.0, [1,0] vs [-1,0] = -1.0
+- Part B: norm of an embedding = 1.0
+- Part C: query "I forgot my password, what should I do?" against 5 stored sentences:
+  - 0.713 How do I change my password?
+  - 0.691 Steps to recover a forgotten login
+  - 0.396 How do I reset my router?
+  - 0.228 How can I SSH into a server?
+  - 0.098 What is the best pizza recipe?
+
+**What surprised me / what I got wrong at first:**
+- "Steps to recover a forgotten login" shares almost no words with my query but scored 0.691, almost the same as the top match. A keyword search would have missed it
+- "Reset my router" shares the word "reset" but scored only 0.396, so embeddings go by meaning, not shared words
+- (add your own: I mistyped/misread the Part A result at first, and the first value should have been 1.0)
+
+**Interview question I can now answer:** *"Why cosine similarity instead of Euclidean distance for embeddings, and why does it get slow at scale?"*
+Embeddings carry meaning in their direction, so cosine ignores differences in vector length. With normalized vectors it reduces to a single dot product, which is cheap. But comparing a query against every stored vector is O(n) per query, so large collections need an approximate index like HNSW.
+
