@@ -62,3 +62,44 @@ The main risk is a false hit: opposite or different questions can have very simi
 **Interview question I can now answer:** *"Why cosine similarity instead of Euclidean distance for embeddings, and why does it get slow at scale?"*
 Embeddings carry meaning in their direction, so cosine ignores differences in vector length. With normalized vectors it reduces to a single dot product, which is cheap. But comparing a query against every stored vector is O(n) per query, so large collections need an approximate index like HNSW.
 
+
+## 3. Vector search and HNSW
+
+**In one line:** Vector search finds the stored vectors closest to a query vector. HNSW is an index that does this approximately but much faster than checking every vector.
+
+**How it works:**
+- Brute force compares the query with every stored vector. It is exact, but the cost grows with the number of vectors (N vectors = N comparisons per query)
+- HNSW (Hierarchical Navigable Small World) stores the vectors as a graph, where each vector is linked to a few nearby vectors
+- Search is a greedy walk: start somewhere, look at the neighbors, move to the one closest to the query, and repeat until no neighbor is closer
+- A single flat graph needs too many small hops, so HNSW uses layers, like a road network: the top layer has few nodes with long links (highways), the lower layers have more nodes with shorter links (local streets), and the bottom layer has every node. A search starts at the top, finds the closest node, drops down a layer from there, and repeats, so each layer gets it closer and the final walk is short. The number of steps grows roughly with log(N) instead of N
+- It is approximate: the greedy walk can stop at a good match that is not the best one
+
+**Settings:**
+- M: links per node (build time). More links means a better graph but more memory
+- efConstruction: candidates considered when linking a new node (build time). Higher gives a better graph and a slower build
+- efSearch: candidates tracked during a query (query time). Higher gives better accuracy and slower queries
+- Cost of HNSW: the graph lives in RAM, and building it makes inserts slower than a plain list append
+
+**Where it's used in this project:** (planned) Redis will keep HNSW indexes for the document vectors and for the cached questions. I'll set M, efConstruction and efSearch when I create the index.
+
+**What I tried:** FAISS HNSW index on 50,000 random vectors of length 384, 100 queries. Brute force took 2.22 ms per query. "Recall" is the fraction of queries where HNSW found the true best match.
+
+| efSearch | ms per query | recall |
+|---|---|---|
+| 1 | 0.036 | 1% |
+| 4 | 0.083 | 3% |
+| 16 | 0.207 | 9% |
+| 64 | 0.630 | 17% |
+| 256 | 1.457 | 41% |
+
+Then I ran it on clustered vectors (500 topic centers plus noise):
+(paste your own table here)
+
+**What surprised me / what I got wrong at first:**
+- With random vectors HNSW was bad: even at efSearch=256 it found the true best only 41% of the time and was only about 1.5x faster than brute force
+- The reason: random vectors in 384 dimensions are almost all perpendicular to each other (the best match scored only about 0.18), so every vector is roughly equally far from the query and the greedy walk has no downhill direction to follow
+- Real text embeddings have structure (similar topics cluster together), and with clustered data the recall was much higher at small efSearch. HNSW depends on structure in the data
+- Brute force with NumPy was faster than I expected (2 ms for 50,000 vectors), so HNSW matters most at large scale. For a small collection, brute force is competitive
+
+**Interview question I can now answer:** *"Why use an approximate index like HNSW instead of exact search, and what do you give up?"*
+Exact search compares the query with every vector, so cost grows linearly with data size. HNSW walks a layered graph and touches only a small fraction of the vectors, so cost grows roughly with log(N). What you give up is a guarantee: it can miss the true nearest neighbor. efSearch controls the balance, since a higher value is more accurate and slower. In a semantic cache a miss means one extra LLM call, which is safer than a false hit that returns a wrong answer.
