@@ -103,3 +103,11 @@ Then I ran it on clustered vectors (500 topic centers plus noise):
 
 **Interview question I can now answer:** *"Why use an approximate index like HNSW instead of exact search, and what do you give up?"*
 Exact search compares the query with every vector, so cost grows linearly with data size. HNSW walks a layered graph and touches only a small fraction of the vectors, so cost grows roughly with log(N). What you give up is a guarantee: it can miss the true nearest neighbor. efSearch controls the balance, since a higher value is more accurate and slower. In a semantic cache a miss means one extra LLM call, which is safer than a false hit that returns a wrong answer.
+
+
+
+## 4. Python patterns used in the project
+
+- **Class and `self`:** A class bundles data and the functions that use it. `__init__` sets up the starting data, and `self` is the object itself, which is how its functions reach its data (`self.store`, `self.hits`). The project creates one shared object (`redis_manager = RedisManager()`) so every file uses the same Redis connection.
+- **try/except:** Run code that might fail, and if it raises an error, jump to `except` instead of crashing. The project uses it for "create if missing": try to read the index, and if that fails because it doesn't exist, create it.
+- **Exact cache limit:** I built a mini exact cache that turns each prompt into a SHA-256 fingerprint and stores the answer under it. "Hello" missed even though "hello" was saved, because a one-letter change gives a completely different fingerprint. The exact cache only catches character-for-character repeats, which is why Layer 2 (semantic) is needed.
