@@ -5,10 +5,20 @@ import faiss
 rng = np.random.default_rng(0)
 N , D = 50_000 , 384
 
+K = 500   # number of topic clusters
+centers = rng.standard_normal((K, D))
+centers /= np.linalg.norm(centers, axis=1, keepdims=True)
+
 def make(n):
-    x = rng.standard_normal((n,D)).astype("float32")
-    x /= np.linalg.norm(x ,axis=1 ,keepdims=True)
+    x = centers[rng.integers(0, K, n)] + (0.5 / np.sqrt(D)) * rng.standard_normal((n, D))
+    x = x.astype("float32")
+    x /= np.linalg.norm(x, axis=1, keepdims=True)
     return x
+
+# def make(n):
+#     x = rng.standard_normal((n,D)).astype("float32")
+#     x /= np.linalg.norm(x ,axis=1 ,keepdims=True)
+#     return x
 
 data = make(N)
 queries = make(100)
