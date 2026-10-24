@@ -18,3 +18,36 @@ async def main():
     print(results, f"together: {time.perf_counter() - start:.1f}s")
 
 asyncio.run(main())
+
+
+
+
+
+async def get_answer():
+    return "hi"  # Return a value
+
+async def main1():
+    x = get_answer()       # No await: returns a coroutine object
+    print(x)
+
+    y = await get_answer() # Await: gets the actual result
+    print(y)               # Output: hi
+
+asyncio.run(main1())       # Run the main coroutine
+
+
+import time
+
+async def slow(name):
+    time.sleep(1)           # Blocks the entire event loop
+    print(name, "done")
+
+async def main2():
+    start = time.perf_counter()
+
+    # Tasks run one after another because sleep blocks
+    await asyncio.gather(slow("A"), slow("B"))
+
+    print(f"{time.perf_counter() - start:.1f}s")  # Total time ≈ 2s
+
+asyncio.run(main2())         # Start the event loop
