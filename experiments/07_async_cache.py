@@ -37,11 +37,12 @@ async def main():
 
     # Run three independent prompts concurrently
     start = time.perf_counter()
-    results = await asyncio.gather(
-        answer("a"),
-        answer("b"),
-        answer("c")
-    )
+    results = await asyncio.gather(answer("x"), answer("x"), answer("x"))
+    # results = await asyncio.gather(
+    #     answer("a"),
+    #     answer("b"),
+    #     answer("c")
+    # )
     print(results, f"Together: {time.perf_counter() - start:.2f}s")
 
 
