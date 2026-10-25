@@ -92,7 +92,7 @@ Embeddings carry meaning in their direction, so cosine ignores differences in ve
 | 64 | 0.630 | 17% |
 | 256 | 1.457 | 41% |
 
-Then I ran it on clustered vectors (500 topic centers plus noise):
+Then I ran it on clustered vectors ():
 (paste your own table here)
 
 **What surprised me / what I got wrong at first:**
@@ -111,3 +111,12 @@ Exact search compares the query with every vector, so cost grows linearly with d
 - **Class and `self`:** A class bundles data and the functions that use it. `__init__` sets up the starting data, and `self` is the object itself, which is how its functions reach its data (`self.store`, `self.hits`). The project creates one shared object (`redis_manager = RedisManager()`) so every file uses the same Redis connection.
 - **try/except:** Run code that might fail, and if it raises an error, jump to `except` instead of crashing. The project uses it for "create if missing": try to read the index, and if that fails because it doesn't exist, create it.
 - **Exact cache limit:** I built a mini exact cache that turns each prompt into a SHA-256 fingerprint and stores the answer under it. "Hello" missed even though "hello" was saved, because a one-letter change gives a completely different fingerprint. The exact cache only catches character-for-character repeats, which is why Layer 2 (semantic) is needed.
+
+
+## 5. Async Python
+
+- **`await`:** Runs an async function and pauses this function until it finishes, so Python can run other work while it waits. If I forget `await`, I get a coroutine object (an unstarted to-do item) instead of the real result. With Redis, `client.get(key)` without `await` returns that object and not my data.
+- **`gather`:** Starts several async calls together and waits for all of them. In my test, three fake LLM calls took 1.25 s together instead of about 3.6 s one after another, because all three waited at the same time. This is why a server can handle many requests that are waiting on Redis or an LLM.
+- **Blocking:** `time.sleep` freezes the whole program, not just one function, so nothing else gets a turn. Only waits that use `await` (like `asyncio.sleep` or an async Redis call) let other work run. `model.encode` is regular blocking code, so while it runs the server can't serve anyone else.
+- **Cache hit vs miss, in miniature:** first `answer("hello")` took 1.24 s (cache lookup + LLM + save), the second took 0.02 s (lookup only).
+- **Limit I noticed:** if identical requests arrive at the same moment, all of them miss the cache and all call the LLM (a cache stampede). Not fixing it in this project, but I can explain it.
