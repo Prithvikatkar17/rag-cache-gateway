@@ -120,3 +120,13 @@ Exact search compares the query with every vector, so cost grows linearly with d
 - **Blocking:** `time.sleep` freezes the whole program, not just one function, so nothing else gets a turn. Only waits that use `await` (like `asyncio.sleep` or an async Redis call) let other work run. `model.encode` is regular blocking code, so while it runs the server can't serve anyone else.
 - **Cache hit vs miss, in miniature:** first `answer("hello")` took 1.24 s (cache lookup + LLM + save), the second took 0.02 s (lookup only).
 - **Limit I noticed:** if identical requests arrive at the same moment, all of them miss the cache and all call the LLM (a cache stampede). Not fixing it in this project, but I can explain it.
+
+
+
+## 6. FastAPI
+
+- **Three pieces:** FastAPI defines the routes (`@app.post("/query")`), uvicorn is the server that runs the app, and Pydantic defines the shape of the data (`class QueryRequest(BaseModel)`). FastAPI uses my type hints to read and check the request body.
+- **Validation:** If the request body doesn't match the model (missing field, wrong type), FastAPI returns 422 and my function never runs. `response_model` checks what I return too. A bad return value gives a 500, which is what happened when I returned a coroutine and a tuple.
+- **Reading errors:** In a long traceback, ignore the `site-packages` lines and read the last few lines. Mine said exactly which fields had which wrong types. Status codes in the log: 200 means success, 404 means no such route (what I got for `/`), 422 means bad input, 500 means my code failed.
+- **lifespan:** Code before `yield` runs once at startup, and code after runs once at shutdown. The project will connect to Redis and create the indexes at startup, and close the connection at shutdown.
+- **My test:** miss on the first call (about 1200 ms), hit on repeats (about 0.01 ms), and "Hello" missed again. The `store` dictionary lives in server memory, so it resets on every `--reload`. Redis will fix that.
