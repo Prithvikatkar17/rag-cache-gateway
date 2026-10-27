@@ -130,3 +130,12 @@ Exact search compares the query with every vector, so cost grows linearly with d
 - **Reading errors:** In a long traceback, ignore the `site-packages` lines and read the last few lines. Mine said exactly which fields had which wrong types. Status codes in the log: 200 means success, 404 means no such route (what I got for `/`), 422 means bad input, 500 means my code failed.
 - **lifespan:** Code before `yield` runs once at startup, and code after runs once at shutdown. The project will connect to Redis and create the indexes at startup, and close the connection at shutdown.
 - **My test:** miss on the first call (about 1200 ms), hit on repeats (about 0.01 ms), and "Hello" missed again. The `store` dictionary lives in server memory, so it resets on every `--reload`. Redis will fix that.
+
+
+
+## 7. Redis and Docker
+
+- **Image vs container:** An image is the packaged, read-only program (`redis/redis-stack`). A container is a running copy of it. I can delete and recreate containers from the same image.
+- **Why `volumes`:** Redis saves its data inside the container. The compose file mounts a Docker volume at `/data`, so the data survives when the container is removed.
+- **Ports:** `6379` is Redis itself (my Python code connects here) and `8001` is the RedisInsight web page. The format `6379:6379` connects a port on my PC to a port in the container.
+- **Why Redis Stack:** Plain Redis has no text search or vector search. Redis Stack adds both, which I need for BM25 and HNSW.
