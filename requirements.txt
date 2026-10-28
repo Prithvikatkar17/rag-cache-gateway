@@ -30,6 +30,7 @@ pydantic==2.14.1
 pydantic_core==2.50.1
 Pygments==2.21.0
 PyYAML==6.0.3
+redis==8.1.0
 regex==2026.9.29
 rich==15.0.0
 safetensors==0.8.0
