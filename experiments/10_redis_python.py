@@ -15,7 +15,7 @@ async def main():
     value = await client.get("greeting")
 
     print(value ,type(value))
-    print(value.decode)
+    print(value.decode())
 
     print(await client.get("missing"))
 
