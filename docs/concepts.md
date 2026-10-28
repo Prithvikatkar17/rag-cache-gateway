@@ -139,3 +139,11 @@ Exact search compares the query with every vector, so cost grows linearly with d
 - **Why `volumes`:** Redis saves its data inside the container. The compose file mounts a Docker volume at `/data`, so the data survives when the container is removed.
 - **Ports:** `6379` is Redis itself (my Python code connects here) and `8001` is the RedisInsight web page. The format `6379:6379` connects a port on my PC to a port in the container.
 - **Why Redis Stack:** Plain Redis has no text search or vector search. Redis Stack adds both, which I need for BM25 and HNSW.
+
+
+### Redis commands (typed by hand in RedisInsight CLI)
+
+- **Strings:** `SET key value` stores a value, `GET key` reads it, and a missing key returns `(nil)`, which is Redis's version of Python's `None` and means a cache miss. Setting the same key again overwrites the old value. Keys are case-sensitive (`GET Greeting` missed when I had set `greeting`), which is the same reason "Hello" missed in my exact cache. `EX 30` makes a key delete itself after 30 seconds, and `TTL key` shows the seconds left (`-1` means no expiry, `-2` means the key is gone). Expiry matters for a cache because stored answers shouldn't live forever if the documents change.
+- **Hashes:** `HSET key field value ...` stores several named fields under one key, and `HGET`/`HGETALL` read one or all of them. The semantic cache needs a hash and not a plain string, because each entry has several parts (prompt, answer, and later the embedding). Key names like `cache:1` use a prefix, and a search index can be told to watch every key starting with `cache:`, which is how it finds my data.
+- **Gotcha:** `docker compose up -d` failed with "failed to connect to the docker API" when Docker Desktop wasn't open. The engine only runs while Docker Desktop is running, so I open it and wait for "Engine running" first. My data survived because it's in the volume.
+- **My test:** after `SET q:1 "first" EX 100` and then `SET q:1 "second"`, `TTL q:1` returned -1 (so a plain `SET` removes the expiry).
