@@ -19,5 +19,18 @@ async def main():
 
     print(await client.get("missing"))
 
+    await client.hset(
+        "cache:2",
+        mapping={
+            "prompt": "reset password?",
+            "answer": "Go to settings."
+        }
+    )
+    data = await client.hgetall("cache:2")
+    print(data)
+
+    await client.set("x" , "y" ,ex=30)
+    print(await client.ttl("x"))
+
 
 asyncio.run(main())
