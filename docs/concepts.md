@@ -153,3 +153,9 @@ Exact search compares the query with every vector, so cost grows linearly with d
 
 - **API with Redis:** `lifespan` creates the Redis client at startup (before `yield`) and closes it at shutdown (after `yield`). The cache key is `"exact:" + sha256(prompt)`, the answer is stored with `ex=300` (a plain SET would remove the expiry), and a hit returns bytes, so I `.decode()` before responding.
 - **Why it survived a restart:** the old dictionary lived inside the Python process and disappeared when the server stopped. Redis runs in its own container, so the answer was still there. My hit after the restart took about 4 ms (a network round trip) versus about 1200 ms for a miss.
+
+
+## 8. BM25 and keyword search
+
+- **Keyword search:** split text into lowercase words and count how often the query words appear in each document.
+- **Where plain counting fails:** (1) repetition beats relevance: for "reset password", a document repeating "password" three times beat the documents that actually explain resetting a password, since both words appeared only once in them; (2) common words dominate: for "the router", 7 of the top score of 10 came from "the". BM25 fixes these with diminishing returns for repeats, rarity weighting, and a length adjustment.
