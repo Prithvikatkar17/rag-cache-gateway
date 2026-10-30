@@ -159,3 +159,7 @@ Exact search compares the query with every vector, so cost grows linearly with d
 
 - **Keyword search:** split text into lowercase words and count how often the query words appear in each document.
 - **Where plain counting fails:** (1) repetition beats relevance: for "reset password", a document repeating "password" three times beat the documents that actually explain resetting a password, since both words appeared only once in them; (2) common words dominate: for "the router", 7 of the top score of 10 came from "the". BM25 fixes these with diminishing returns for repeats, rarity weighting, and a length adjustment.
+
+- **IDF (rarity):** ln(1 + (N - n + 0.5)/(n + 0.5)), where n is how many documents contain the word. "router" (in 1 of 4 docs) got 1.204 and "password" (in 3 of 4) got 0.357, so rare words count more. This fixed "the" dominating. With only 4 documents it can't show the full effect.
+- **TF part (diminishing returns):** tf × (k1+1) / (tf + k1 × length_factor). With k1 = 1.5 one mention is worth 1.0, three mentions 1.67, ten mentions only 2.17, with a hard cap of k1 + 1 = 2.5. This fixed repetition beating relevance: for "reset password", the documents with both words (0.870, 0.839) now beat the ones repeating one word.
+- **Length factor:** 1 - b + b × len(doc)/avgdl. A longer-than-average document is penalized (doc 1, with 30 words against an average of 15, has a factor of 1.75). With b = 0 the penalty disappears, and with k1 = 0 repeats stop counting.
