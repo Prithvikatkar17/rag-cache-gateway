@@ -166,3 +166,8 @@ Exact search compares the query with every vector, so cost grows linearly with d
 
 - **BM25 vs embeddings (my test, 6 docs, 3 queries):** For `ERR_CONN_RESET` both found the right document (BM25 2.63 vs 0.65, embeddings 0.80 vs 0.37). For `recovering lost credentials` and `slow internet keeps disconnecting`, BM25 scored 0 for every document because no words were shared ("recovering" vs "recover", "disconnecting" vs "dropped connections"), while embeddings found the right document (0.76 and 0.49). I expected embeddings to struggle with the rare token, but they didn't.
 - **Takeaway:** BM25 gives a clear "no match" (score 0) and is precise on exact strings, but it cannot handle paraphrases. Embeddings handle meaning but always return a best guess, even a bad one. The cases where embeddings are weak are near-identical identifiers (error codes, versions), which my small test didn't reach.
+
+## 9. RRF (Reciprocal Rank Fusion)
+
+- **Why scores can't be added directly:** BM25 scores and cosine scores are on different scales (BM25 was around 12, cosine under 1), and BM25 scores aren't comparable even between libraries. In my test, adding raw scores gave exactly the BM25 ranking, so the embeddings had no real vote.
+- **Min-max normalization is fragile:** scaling each list to 0..1 first helped, but (1) one outlier (BM25 for A at 40) made B's fused score fall from 1.20 to 0.54 though B's own scores didn't change, and (2) a list where every score is equal (BM25 found nothing) gives a division by zero. RRF avoids both by using only ranks, not scores.
