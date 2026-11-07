@@ -171,3 +171,8 @@ Exact search compares the query with every vector, so cost grows linearly with d
 
 - **Why scores can't be added directly:** BM25 scores and cosine scores are on different scales (BM25 was around 12, cosine under 1), and BM25 scores aren't comparable even between libraries. In my test, adding raw scores gave exactly the BM25 ranking, so the embeddings had no real vote.
 - **Min-max normalization is fragile:** scaling each list to 0..1 first helped, but (1) one outlier (BM25 for A at 40) made B's fused score fall from 1.20 to 0.54 though B's own scores didn't change, and (2) a list where every score is equal (BM25 found nothing) gives a division by zero. RRF avoids both by using only ranks, not scores.
+
+
+- **Formula:** RRF score(doc) = sum over each list that contains it of 1 / (k + rank), with rank starting at 1 and k = 60. Missing from a list means no contribution from it. Example: C was 2nd in BM25 and 1st in embeddings, so 1/62 + 1/61 = 0.03252.
+- **Why it works:** it uses only ranks, so score scales don't matter, outliers can't distort it, and an empty list (BM25 found nothing) just adds nothing. Documents that appear in both lists beat documents in one: B (3rd and 4th, in both) scored 0.0315 against D (2nd in only the embedding list) at 0.0161.
+- **Trade-off:** RRF throws away how large the scores were. D had a strong embedding score (0.78) but still ranked 4th. Also, `enumerate(..., start=1)` matters: starting at 0 would make first place rank 0.
