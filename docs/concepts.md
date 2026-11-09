@@ -179,3 +179,10 @@ Exact search compares the query with every vector, so cost grows linearly with d
 
 - **What `k` does:** it sets how much top positions are worth versus lower ones. With the same lists (bm = A..E, em = F, G, H, D, E): at k = 1, A (1st in one list) scored 0.5 and beat D (4th in both) at 0.4; at k = 60, D scored 0.031 and beat A at 0.016; at k = 1000 the scores only reflect how many lists contain the document. Default 60 favors agreement between the lists. I won't tune it before I have real data.
 - **Empty list:** BM25 only returns documents with a score above 0, otherwise unmatched documents would earn rank points. When BM25 found nothing ("recovering lost credentials"), the fused list was exactly the embedding ranking (scores 1/61, 1/62, 1/63), so RRF falls back to the other method. On my 6 documents RRF never changed a top answer, because the lists agreed or one was empty. Its value shows when they disagree.
+
+## 10. RAG
+
+- **Three steps:** retrieve the most relevant chunks (embeddings + BM25 + RRF), augment the prompt by pasting those chunks in with the question, then generate with the LLM. The LLM doesn't change; it's only given the right reading material. In the project, this is the expensive path that runs on a cache miss.
+- **Prompt shape:** instructions, then numbered context (best chunk first, with a fallback line when nothing was found), then the question.
+- **Grounding test (invented company, so the model can't know the answer):** with the instruction, it answered "14 days" when the context had it, and replied with the exact sentence "I don't know based on the provided documents." when the context was unrelated or empty. Without the instruction: with unrelated context it said the context doesn't mention refunds and stopped (fine), but with no context at all it answered from general knowledge (refund windows for Amazon, Swiggy, IRCTC) and never mentioned AcmeCloud.
+- **Why the instruction line matters:** it forbids outside knowledge (the empty-context case shows what happens without it), it makes the refusal a fixed sentence my code can detect, and it keeps behavior consistent across models and cases.
