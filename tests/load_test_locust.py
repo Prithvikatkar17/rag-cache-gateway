@@ -1,4 +1,5 @@
 import random
+import uuid
 from locust import HttpUser, task, between
 
 PROMPTS = [
@@ -38,4 +39,33 @@ class QueryUser(HttpUser):
                     resp.failure("unexpected status")
                 else:
                     # If the status code is 200 AND the JSON looks right, mark it as a pass
+                    resp.success()
+
+class MissUser(HttpUser):
+    # Each simulated user pauses between 0.5 and 2 seconds between requests
+    wait_time = between(0.5, 2)
+
+    @task
+    def ask(self):
+        # TODO 1: Create a completely random question using UUID
+        # uuid4() generates a random 36-character string like "123e4567-e89b-12d3-a456-426614174000"
+        prompt = f"Unique question {uuid.uuid4()}"
+        
+        # We use name="/query" so Locust groups all these random URLs under one clean label in the dashboard
+        with self.client.post("/query", json={"prompt": prompt},
+                              catch_response=True, name="/query") as resp:
+            
+            # TODO 2: Grade the response just like we did in QueryUser
+            if resp.status_code != 200:
+                # The server crashed or refused the connection
+                resp.failure(f"HTTP {resp.status_code}")
+            else:
+                data = resp.json()
+                valid_statuses = ["CACHE_HIT", "CACHE_MISS", "EXACT_CACHE_HIT", "SEMANTIC_CACHE_HIT"]
+                
+                # Check if our server replied with the correct JSON format
+                if data.get("status") not in valid_statuses:
+                    resp.failure("unexpected status")
+                else:
+                    # Everything went perfectly!
                     resp.success()
