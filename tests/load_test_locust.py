@@ -53,19 +53,28 @@ class MissUser(HttpUser):
         
         # We use name="/query" so Locust groups all these random URLs under one clean label in the dashboard
         with self.client.post("/query", json={"prompt": prompt},
-                              catch_response=True, name="/query") as resp:
-            
-            # TODO 2: Grade the response just like we did in QueryUser
+            catch_response=True, name="/query") as resp:
             if resp.status_code != 200:
-                # The server crashed or refused the connection
                 resp.failure(f"HTTP {resp.status_code}")
+                return
+            server_ms = resp.json()["execution_time_ms"]
+            client_ms = resp.elapsed.total_seconds() * 1000
+            if client_ms > 3000:
+                resp.failure(f"slow: client {client_ms:.0f} ms, server {server_ms:.0f} ms")
             else:
-                data = resp.json()
-                valid_statuses = ["CACHE_HIT", "CACHE_MISS", "EXACT_CACHE_HIT", "SEMANTIC_CACHE_HIT"]
+                resp.success()
+            
+            # # TODO 2: Grade the response just like we did in QueryUser
+            # if resp.status_code != 200:
+            #     # The server crashed or refused the connection
+            #     resp.failure(f"HTTP {resp.status_code}")
+            # else:
+            #     data = resp.json()
+            #     valid_statuses = ["CACHE_HIT", "CACHE_MISS", "EXACT_CACHE_HIT", "SEMANTIC_CACHE_HIT"]
                 
-                # Check if our server replied with the correct JSON format
-                if data.get("status") not in valid_statuses:
-                    resp.failure("unexpected status")
-                else:
-                    # Everything went perfectly!
-                    resp.success()
+            #     # Check if our server replied with the correct JSON format
+            #     if data.get("status") not in valid_statuses:
+            #         resp.failure("unexpected status")
+            #     else:
+            #         # Everything went perfectly!
+            #         resp.success()
